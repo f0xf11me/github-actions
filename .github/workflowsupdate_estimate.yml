@@ -1,0 +1,55 @@
+name: Update Estimate in Excel
+
+on:
+  pull_request:
+    types:
+      - opened
+      - closed
+
+jobs:
+  update-excel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: GitHub CLI をセットアップ
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: PR に関連する Issue の estimate を取得
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          # PR に関連する Issue を取得（自動）
+          ISSUE_NUMBER=$(gh pr view "$PR_NUMBER" --json closingIssuesReferences -q '.closingIssuesReferences[].number')
+
+          if [[ -z "$ISSUE_NUMBER" ]]; then
+            echo "関連する Issue が見つかりません。処理を終了します。"
+            exit 0
+          fi
+
+          # Issue のラベルを取得
+          ESTIMATE_LABEL=$(gh issue view "$ISSUE_NUMBER" --json labels -q '.labels[].name' | grep 'estimate:' | cut -d':' -f2)
+
+          if [[ -z "$ESTIMATE_LABEL" ]]; then
+            echo "Estimate ラベルが見つかりません。処理を終了します。"
+            exit 0
+          fi
+
+          # Excel 形式の CSV ファイルに追加
+          ACTION="${{ github.event.action }}"
+          echo "$PR_NUMBER,$ISSUE_NUMBER,$ESTIMATE_LABEL,$ACTION" >> estimate.csv
+
+      - name: 変更をコミット（マージ時のみ）
+        if: github.event.pull_request.merged == true
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add estimate.csv
+          git commit -m "Update estimate values from merged PR"
+          git push origin main
+        continue-on-error: true  # 変更がない場合はスキップ
