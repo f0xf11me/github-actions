@@ -1,0 +1,25 @@
+name: Test Node.js on PR
+
+on:
+  pull_request:
+    types:
+      - opened  # PR 作成時に実行
+      - synchronize  # PR に新しいコミットが追加されたとき
+      - reopened  # 閉じた PR を再度開いたとき
+
+jobs:
+  run-node:
+    runs-on: ubuntu-latest  # GitHubの仮想マシン（Ubuntu 22.04）
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # ここで実行したい Node.js のバージョンを指定
+
+      - name: Node.js スクリプトを実行
+        run: |
+          node -e "console.log('hoge');"
