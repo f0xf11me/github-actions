@@ -9,21 +9,21 @@ on:
 
 jobs:
   write-excel:
-    runs-on: ubuntu-latest #ubuntuを立ち上げ。Github Actionsは毎回まっさらな仮想マシンを立ち上げる
+    runs-on: ubuntu-latest
 
     steps:
       - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4 #git cloneした状態
+        uses: actions/checkout@v4
 
       - name: Node.js をセットアップ
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # 必要なNode.jsバージョンを指定
+          node-version: '18'
 
-      - name: 依存パッケージをインストール
+      - name: 必要パッケージをインストール
         run: npm install xlsx
 
-      - name: Node.js スクリプトを実行（Excel 書き込み）
+      - name: Node.js スクリプトで Excel を書き込み
         run: node -e '
           const XLSX = require("xlsx");
           const fs = require("fs");
@@ -42,15 +42,10 @@ jobs:
 
           workbook.Sheets[sheetName] = sheet;
           XLSX.writeFile(workbook, filePath);
-
-          console.log("Excel にデータを書き込みました:", filePath);
         '
 
-      - name: Excel ファイルを GitHub にコミット
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add data.xlsx
-          git commit -m "Update Excel file"
-          git push origin main
-        continue-on-error: true  # 変更がない場合はスキップ
+      - name: Excel ファイルをアーティファクトとしてアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-file
+          path: data.xlsx
