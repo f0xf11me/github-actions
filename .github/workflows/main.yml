@@ -26,8 +26,11 @@ jobs:
       - name: Node.js スクリプトを実行（Excel 書き込み）
         run: node .github/scripts/writeExcel.js
 
-      - name: Excel ファイルをアーティファクトとして保存
-        uses: actions/upload-artifact@v4  # ✅ v4 に更新
-        with:
-          name: excel-output
-          path: data.xlsx
+      - name: Excel ファイルを GitHub にコミット
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/excel/data.xlsx
+          git commit -m "Update Excel file"
+          git push origin HEAD:${{ github.ref_name }}
+        continue-on-error: true
