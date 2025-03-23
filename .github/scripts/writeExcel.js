@@ -10,11 +10,18 @@ try {
 }
 
 const sheetName = "Sheet1";
-let sheet = workbook.Sheets[sheetName] || XLSX.utils.aoa_to_sheet([["A1"]]);
+let sheet = workbook.Sheets[sheetName];
 
-sheet["A1"] = { t: "s", v: "Hello from GitHub Actions!" };
+// シートが存在しない場合、新しく作成して追加する
+if (!sheet) {
+  sheet = XLSX.utils.aoa_to_sheet([["Hello from GitHub Actions!"]]);
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+} else {
+  sheet["A1"] = { t: "s", v: "Hello from GitHub Actions!" };
+  workbook.Sheets[sheetName] = sheet;
+}
 
-workbook.Sheets[sheetName] = sheet;
+// 最後に書き込む
 XLSX.writeFile(workbook, filePath);
 
-console.log("Excel にデータを書き込みました:", filePath);
+console.log("✅ Excel にデータを書き込みました:", filePath);
