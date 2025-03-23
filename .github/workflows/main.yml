@@ -20,32 +20,18 @@ jobs:
         with:
           node-version: '18'
 
-      - name: 必要パッケージをインストール
+      - name: 依存パッケージをインストール
         run: npm install xlsx
 
-      - name: Node.js スクリプトで Excel を書き込み
-        run: node -e '
-          const XLSX = require("xlsx");
-          const fs = require("fs");
+      - name: Node.js スクリプトを実行（Excel 書き込み）
+        run: node .github/scripts/writeExcel.js
 
-          const filePath = "data.xlsx";
-          let workbook;
-          try {
-            workbook = XLSX.readFile(filePath);
-          } catch (e) {
-            workbook = XLSX.utils.book_new();
-          }
-          const sheetName = "Sheet1";
-          let sheet = workbook.Sheets[sheetName] || XLSX.utils.aoa_to_sheet([["A1"]]);
 
-          sheet["A1"] = { t: "s", v: "Hello from GitHub Actions!" };
-
-          workbook.Sheets[sheetName] = sheet;
-          XLSX.writeFile(workbook, filePath);
-        '
-
-      - name: Excel ファイルをアーティファクトとしてアップロード
-        uses: actions/upload-artifact@v4
-        with:
-          name: excel-file
-          path: data.xlsx
+      - name: Excel ファイルを GitHub にコミット
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.xlsx
+          git commit -m "Update Excel file"
+          git push origin main
+        continue-on-error: true
