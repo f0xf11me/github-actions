@@ -1,55 +1,56 @@
-name: Update Estimate in Excel
+name: Write to Excel with Node.js
 
 on:
   pull_request:
     types:
       - opened
-      - closed
+      - synchronize
+      - reopened
 
 jobs:
-  update-excel:
-    runs-on: ubuntu-latest
+  write-excel:
+    runs-on: ubuntu-latest #ubuntuを立ち上げ。Github Actionsは毎回まっさらな仮想マシンを立ち上げる
 
     steps:
       - name: リポジトリをチェックアウト
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 #git cloneした状態
 
-      - name: GitHub CLI をセットアップ
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'  # 必要なNode.jsバージョンを指定
 
-      - name: PR に関連する Issue の estimate を取得
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
+      - name: 依存パッケージをインストール
+        run: npm install xlsx
 
-          # PR に関連する Issue を取得（自動）
-          ISSUE_NUMBER=$(gh pr view "$PR_NUMBER" --json closingIssuesReferences -q '.closingIssuesReferences[].number')
+      - name: Node.js スクリプトを実行（Excel 書き込み）
+        run: node -e '
+          const XLSX = require("xlsx");
+          const fs = require("fs");
 
-          if [[ -z "$ISSUE_NUMBER" ]]; then
-            echo "関連する Issue が見つかりません。処理を終了します。"
-            exit 0
-          fi
+          const filePath = "data.xlsx";
+          let workbook;
+          try {
+            workbook = XLSX.readFile(filePath);
+          } catch (e) {
+            workbook = XLSX.utils.book_new();
+          }
+          const sheetName = "Sheet1";
+          let sheet = workbook.Sheets[sheetName] || XLSX.utils.aoa_to_sheet([["A1"]]);
 
-          # Issue のラベルを取得
-          ESTIMATE_LABEL=$(gh issue view "$ISSUE_NUMBER" --json labels -q '.labels[].name' | grep 'estimate:' | cut -d':' -f2)
+          sheet["A1"] = { t: "s", v: "Hello from GitHub Actions!" };
 
-          if [[ -z "$ESTIMATE_LABEL" ]]; then
-            echo "Estimate ラベルが見つかりません。処理を終了します。"
-            exit 0
-          fi
+          workbook.Sheets[sheetName] = sheet;
+          XLSX.writeFile(workbook, filePath);
 
-          # Excel 形式の CSV ファイルに追加
-          ACTION="${{ github.event.action }}"
-          echo "$PR_NUMBER,$ISSUE_NUMBER,$ESTIMATE_LABEL,$ACTION" >> estimate.csv
+          console.log("Excel にデータを書き込みました:", filePath);
+        '
 
-      - name: 変更をコミット（マージ時のみ）
-        if: github.event.pull_request.merged == true
+      - name: Excel ファイルを GitHub にコミット
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add estimate.csv
-          git commit -m "Update estimate values from merged PR"
+          git add data.xlsx
+          git commit -m "Update Excel file"
           git push origin main
         continue-on-error: true  # 変更がない場合はスキップ
