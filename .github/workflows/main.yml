@@ -1,15 +1,15 @@
-name: Test Node.js on PR
+name: Write to Excel with Node.js
 
 on:
   pull_request:
     types:
-      - opened  # PR 作成時に実行
-      - synchronize  # PR に新しいコミットが追加されたとき
-      - reopened  # 閉じた PR を再度開いたとき
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
-  run-node:
-    runs-on: ubuntu-latest  # GitHubの仮想マシン（Ubuntu 22.04）
+  write-excel:
+    runs-on: ubuntu-latest
 
     steps:
       - name: リポジトリをチェックアウト
@@ -18,8 +18,34 @@ jobs:
       - name: Node.js をセットアップ
         uses: actions/setup-node@v4
         with:
-          node-version: '18'  # ここで実行したい Node.js のバージョンを指定
+          node-version: '18'
 
-      - name: Node.js スクリプトを実行
-        run: |
-          node -e "console.log('hoge');"
+      - name: 必要パッケージをインストール
+        run: npm install xlsx
+
+      - name: Node.js スクリプトで Excel を書き込み
+        run: node -e '
+          const XLSX = require("xlsx");
+          const fs = require("fs");
+
+          const filePath = "data.xlsx";
+          let workbook;
+          try {
+            workbook = XLSX.readFile(filePath);
+          } catch (e) {
+            workbook = XLSX.utils.book_new();
+          }
+          const sheetName = "Sheet1";
+          let sheet = workbook.Sheets[sheetName] || XLSX.utils.aoa_to_sheet([["A1"]]);
+
+          sheet["A1"] = { t: "s", v: "Hello from GitHub Actions!" };
+
+          workbook.Sheets[sheetName] = sheet;
+          XLSX.writeFile(workbook, filePath);
+        '
+
+      - name: Excel ファイルをアーティファクトとしてアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-file
+          path: data.xlsx
