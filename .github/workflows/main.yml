@@ -24,7 +24,7 @@ jobs:
         run: npm install xlsx
 
       - name: Node.js スクリプトを実行（Excel 書き込み）
-        run: node .github/scripts/writeExcel.js
+        run: node .github/scripts/writeToExcel.js "${{ github.event.issue.number }}" "${{ github.event.issue.title }}"
 
       - name: Excel ファイルを GitHub にコミット
         run: |
