@@ -30,7 +30,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
           git add .github/excel/data.xlsx
           git commit -m "Update Excel file" || echo "No changes to commit"
-          git pull origin main
           git push origin HEAD:main
