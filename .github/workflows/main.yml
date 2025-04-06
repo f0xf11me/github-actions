@@ -21,9 +21,9 @@ jobs:
           node-version: '18'
 
       - name: 依存パッケージをインストール
-        run: npm install xlsx
+        run: npm install xlsx node-fetch@2
 
-      - name: Git 設定とリモート最新の取得
+      - name: Git 設定とリモート同期
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -31,13 +31,16 @@ jobs:
           git reset --hard origin/main
 
       - name: Node.js スクリプトを実行（Excel 書き込み）
-        run: node .github/scripts/writeExcel.js "${{ github.event.issue.number }}" "${{ github.event.issue.title }}"
+        run: node .github/scripts/writeExcel.js "${{ github.event.pull_request.body }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Excel ファイルを GitHub にコミット（変更があるときだけ）
         run: |
           git add .github/excel/data.xlsx
           if ! git diff --cached --quiet; then
-            git commit -m "Update Excel file"
+            git commit -m "Update Excel file from PR #${{ github.event.pull_request.number }}"
             git push origin HEAD:refs/heads/main
           else
             echo "No changes to commit"

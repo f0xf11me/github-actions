@@ -1,44 +1,74 @@
-const XLSX = require("xlsx");
-const fs = require("fs");
+// 必要なパッケージ: npm install xlsx node-fetch@2
+const fs = require('fs');
+const path = require('path');
+const xlsx = require('xlsx');
+const fetch = require('node-fetch');
 
-const issueNumber = process.argv[2];
-const issueTitle = process.argv[3];
+const prBody = process.argv[2];
+const token = process.env.GITHUB_TOKEN;
+const repo = process.env.GITHUB_REPOSITORY;
 
-const dirPath = ".github/excel";
-const filePath = `${dirPath}/data.xlsx`;
-
-if (!fs.existsSync(dirPath)) {
-  fs.mkdirSync(dirPath, { recursive: true });
+if (!prBody || !token || !repo) {
+  console.error("❌ 引数または環境変数が不足しています");
+  process.exit(1);
 }
 
-let workbook;
-
-try {
-  workbook = XLSX.readFile(filePath);
-} catch (e) {
-  workbook = XLSX.utils.book_new();
+// PR 本文から #番号 を取得
+const match = prBody.match(/#(\d+)/);
+if (!match) {
+  console.error("❌ PR body に issue 番号 (#xx) が見つかりませんでした");
+  process.exit(1);
 }
 
-const sheetName = "Issues";
-let sheet = workbook.Sheets[sheetName];
+const issueNumber = match[1];
 
-if (!sheet) {
-  // 初期化（ヘッダー追加）
-  sheet = XLSX.utils.aoa_to_sheet([["Issue Number", "Title"]]);
-  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+// GitHub API から Issue タイトルを取得
+async function getIssueTitle() {
+  const url = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`GitHub API error: ${res.status}`);
+  }
+
+  const json = await res.json();
+  return json.title;
 }
 
-// シートのデータ取得
-const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+async function writeToExcel() {
+  const issueTitle = await getIssueTitle();
 
-// 次の空行に追加
-sheetData.push([issueNumber, issueTitle]);
+  console.log(`📄 Issue #${issueNumber}: ${issueTitle}`);
 
-// シート再生成
-const newSheet = XLSX.utils.aoa_to_sheet(sheetData);
-workbook.Sheets[sheetName] = newSheet;
+  const filePath = path.resolve(__dirname, '../excel/data.xlsx');
+  let workbook;
+  let worksheet;
 
-// 書き込み
-XLSX.writeFile(workbook, filePath);
+  if (fs.existsSync(filePath)) {
+    workbook = xlsx.readFile(filePath);
+    worksheet = workbook.Sheets[workbook.SheetNames[0]];
+  } else {
+    workbook = xlsx.utils.book_new();
+    worksheet = xlsx.utils.aoa_to_sheet([["Issue Number", "Title"]]);
+    xlsx.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  }
 
-console.log(`✅ Issue #${issueNumber} を Excel に追記しました`);
+  const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
+  data.push([`#${issueNumber}`, issueTitle]);
+
+  const newSheet = xlsx.utils.aoa_to_sheet(data);
+  workbook.Sheets[workbook.SheetNames[0]] = newSheet;
+  xlsx.writeFile(workbook, filePath);
+
+  console.log("✅ Excel ファイルに追記しました");
+}
+
+writeToExcel().catch(err => {
+  console.error("❌ エラー:", err.message);
+  process.exit(1);
+});
