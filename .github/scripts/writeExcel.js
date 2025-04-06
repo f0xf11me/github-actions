@@ -3,20 +3,23 @@ const path = require('path');
 const xlsx = require('xlsx');
 const fetch = require('node-fetch');
 
-// 引数：event名, PR本文
-const eventName = process.argv[2];
-const prBody = process.argv[3];
+// 引数
+const eventName = process.argv[2]; // pull_request
+const prBody = process.argv[3];    // "#18" など含むPR本文
+const isMerged = process.argv[4] === 'true'; // 'true' or 'false'
+
 const token = process.env.GITHUB_TOKEN;
 const repo = process.env.GITHUB_REPOSITORY;
+
+console.log(`🟢 イベント名: ${eventName}`);
+console.log(`🔄 マージ済み: ${isMerged}`);
 
 if (!prBody || !token || !repo || !eventName) {
   console.error("❌ 引数または環境変数が不足しています");
   process.exit(1);
 }
 
-console.log(`📦 GitHub Event: ${eventName}`);
-
-// #番号 を PR body から抽出
+// PR本文から `#18` のような Issue 番号を抽出
 const match = prBody.match(/#(\d+)/);
 if (!match) {
   console.error("❌ PR body に issue 番号 (#xx) が見つかりませんでした");
@@ -25,7 +28,7 @@ if (!match) {
 
 const issueNumber = match[1];
 
-// GitHub API で issue タイトルを取得
+// GitHub API から issue タイトル取得
 async function getIssueTitle() {
   const url = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
   const res = await fetch(url, {
@@ -43,7 +46,7 @@ async function getIssueTitle() {
   return json.title;
 }
 
-// Excel 更新処理
+// Excel に「済」記入
 async function markAsDone(issueTitle) {
   const filePath = path.resolve(__dirname, '../excel/data.xlsx');
   const workbook = xlsx.readFile(filePath);
@@ -57,8 +60,8 @@ async function markAsDone(issueTitle) {
   const range = xlsx.utils.decode_range(worksheet["!ref"]);
   let updated = false;
 
-  // イベントに応じた列番号を決定（D列 = 3, F列 = 5）
-  const targetCol = eventName === 'pull_request_review' ? 5 : 3;
+  // 📍 D列: PR 作成 or 更新時 ／ F列: マージ時
+  const targetCol = isMerged ? 5 : 3;
 
   for (let row = range.s.r + 1; row <= range.e.r; row++) {
     const titleCell = worksheet[xlsx.utils.encode_cell({ r: row, c: 1 })]; // B列
