@@ -23,14 +23,17 @@ jobs:
       - name: 依存パッケージをインストール
         run: npm install xlsx
 
-      - name: Node.js スクリプトを実行（Excel 書き込み）
-        run: node .github/scripts/writeExcel.js "${{ github.event.issue.number }}" "${{ github.event.issue.title }}"
-
       - name: Excel ファイルを GitHub にコミット
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
+
+      - name: Node.js スクリプトを実行（Excel 書き込み）
+        run: node .github/scripts/writeExcel.js "${{ github.event.issue.number }}" "${{ github.event.issue.title }}"
+
+      - name: Excel ファイルを GitHub にコミット
+        run: |
           git add .github/excel/data.xlsx
           git commit -m "Update Excel file"
           git push origin HEAD:refs/heads/main
