@@ -6,6 +6,9 @@ on:
       - opened
       - synchronize
       - reopened
+  pull_request_review:
+    types:
+      - submitted
 
 jobs:
   write-excel:
@@ -31,7 +34,7 @@ jobs:
           git reset --hard origin/main
 
       - name: Node.js スクリプトを実行（Excel 書き込み）
-        run: node .github/scripts/writeExcel.js "${{ github.event.pull_request.body }}"
+        run: node .github/scripts/writeExcel.js "${{ github.event_name }}" "${{ github.event.pull_request.body }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}

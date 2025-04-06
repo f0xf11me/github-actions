@@ -1,19 +1,22 @@
-// 必要パッケージ: npm install xlsx node-fetch@2
 const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
 const fetch = require('node-fetch');
 
-const prBody = process.argv[2];
+// 引数：event名, PR本文
+const eventName = process.argv[2];
+const prBody = process.argv[3];
 const token = process.env.GITHUB_TOKEN;
 const repo = process.env.GITHUB_REPOSITORY;
 
-if (!prBody || !token || !repo) {
+if (!prBody || !token || !repo || !eventName) {
   console.error("❌ 引数または環境変数が不足しています");
   process.exit(1);
 }
 
-// PR 本文から issue 番号を抽出（例: "#18"）
+console.log(`📦 GitHub Event: ${eventName}`);
+
+// #番号 を PR body から抽出
 const match = prBody.match(/#(\d+)/);
 if (!match) {
   console.error("❌ PR body に issue 番号 (#xx) が見つかりませんでした");
@@ -22,7 +25,7 @@ if (!match) {
 
 const issueNumber = match[1];
 
-// GitHub API から Issue タイトルを取得
+// GitHub API で issue タイトルを取得
 async function getIssueTitle() {
   const url = `https://api.github.com/repos/${repo}/issues/${issueNumber}`;
   const res = await fetch(url, {
@@ -40,33 +43,32 @@ async function getIssueTitle() {
   return json.title;
 }
 
-// Excel に「済」を書き込む
+// Excel 更新処理
 async function markAsDone(issueTitle) {
   const filePath = path.resolve(__dirname, '../excel/data.xlsx');
-
-  if (!fs.existsSync(filePath)) {
-    throw new Error("Excel ファイルが見つかりません");
-  }
-
   const workbook = xlsx.readFile(filePath);
   const sheetName = "issue一覧";
   const worksheet = workbook.Sheets[sheetName];
 
   if (!worksheet) {
-    throw new Error(`シート '${sheetName}' が見つかりません`);
+    throw new Error(`❌ シート '${sheetName}' が見つかりません`);
   }
 
   const range = xlsx.utils.decode_range(worksheet["!ref"]);
   let updated = false;
 
+  // イベントに応じた列番号を決定（D列 = 3, F列 = 5）
+  const targetCol = eventName === 'pull_request_review' ? 5 : 3;
+
   for (let row = range.s.r + 1; row <= range.e.r; row++) {
     const titleCell = worksheet[xlsx.utils.encode_cell({ r: row, c: 1 })]; // B列
 
     if (titleCell && titleCell.v === issueTitle) {
-      const statusCellAddress = xlsx.utils.encode_cell({ r: row, c: 3 }); // D列（0始まり）
-      worksheet[statusCellAddress] = { t: "s", v: "済" };
+      const statusCellAddr = xlsx.utils.encode_cell({ r: row, c: targetCol });
+      worksheet[statusCellAddr] = { t: 's', v: '済' };
       updated = true;
-      console.log(`✅ '${issueTitle}' に一致：${statusCellAddress} に「済」を書き込みました`);
+
+      console.log(`✅ '${issueTitle}' に一致：${statusCellAddr} に「済」を書き込みました`);
       break;
     }
   }
