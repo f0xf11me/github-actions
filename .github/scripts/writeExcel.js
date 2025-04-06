@@ -1,4 +1,4 @@
-// 必要なパッケージ: npm install xlsx node-fetch@2
+// 必要パッケージ: npm install xlsx node-fetch@2
 const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
@@ -13,7 +13,7 @@ if (!prBody || !token || !repo) {
   process.exit(1);
 }
 
-// PR 本文から #番号 を取得
+// PR 本文から issue 番号を抽出（例: "#18"）
 const match = prBody.match(/#(\d+)/);
 if (!match) {
   console.error("❌ PR body に issue 番号 (#xx) が見つかりませんでした");
@@ -40,35 +40,51 @@ async function getIssueTitle() {
   return json.title;
 }
 
-async function writeToExcel() {
-  const issueTitle = await getIssueTitle();
-
-  console.log(`📄 Issue #${issueNumber}: ${issueTitle}`);
-
+// Excel に「済」を書き込む
+async function markAsDone(issueTitle) {
   const filePath = path.resolve(__dirname, '../excel/data.xlsx');
-  let workbook;
-  let worksheet;
 
-  if (fs.existsSync(filePath)) {
-    workbook = xlsx.readFile(filePath);
-    worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  } else {
-    workbook = xlsx.utils.book_new();
-    worksheet = xlsx.utils.aoa_to_sheet([["Issue Number", "Title"]]);
-    xlsx.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  if (!fs.existsSync(filePath)) {
+    throw new Error("Excel ファイルが見つかりません");
   }
 
-  const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 });
-  data.push([`#${issueNumber}`, issueTitle]);
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = "issue一覧";
+  const worksheet = workbook.Sheets[sheetName];
 
-  const newSheet = xlsx.utils.aoa_to_sheet(data);
-  workbook.Sheets[workbook.SheetNames[0]] = newSheet;
+  if (!worksheet) {
+    throw new Error(`シート '${sheetName}' が見つかりません`);
+  }
+
+  const range = xlsx.utils.decode_range(worksheet["!ref"]);
+  let updated = false;
+
+  for (let row = range.s.r + 1; row <= range.e.r; row++) {
+    const titleCell = worksheet[xlsx.utils.encode_cell({ r: row, c: 1 })]; // B列
+
+    if (titleCell && titleCell.v === issueTitle) {
+      const statusCellAddress = xlsx.utils.encode_cell({ r: row, c: 3 }); // D列（0始まり）
+      worksheet[statusCellAddress] = { t: "s", v: "済" };
+      updated = true;
+      console.log(`✅ '${issueTitle}' に一致：${statusCellAddress} に「済」を書き込みました`);
+      break;
+    }
+  }
+
+  if (!updated) {
+    console.log(`⚠️ 一致するタイトル '${issueTitle}' が見つかりませんでした`);
+  }
+
   xlsx.writeFile(workbook, filePath);
-
-  console.log("✅ Excel ファイルに追記しました");
 }
 
-writeToExcel().catch(err => {
-  console.error("❌ エラー:", err.message);
-  process.exit(1);
-});
+(async () => {
+  try {
+    const title = await getIssueTitle();
+    console.log(`📝 Issue タイトル: ${title}`);
+    await markAsDone(title);
+  } catch (err) {
+    console.error("❌ エラー:", err.message);
+    process.exit(1);
+  }
+})();
